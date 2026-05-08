@@ -1,0 +1,77 @@
+# Ultra Low Power RISC-V with ESP-IDF
+
+Ultra Low Power (ULP) RISC-V examples and applications for ESP32 microcontrollers using the ESP-IDF framework. This project focuses on ultra-low-energy embedded systems, autonomous background processing, sensor monitoring, wake-up control, and optimized power consumption techniques.
+
+## Features
+* ULP RISC-V programming with ESP-IDF
+* Deep sleep and wake-up management
+* Autonomous sensor monitoring
+* GPIO control from ULP core
+* Low-power optimization techniques
+* Example applications for ESP32 series
+* Modular and easy-to-expand structure
+
+## Supported Devices
+* ESP32-S2
+* ESP32-S3
+* ESP32-C3
+* ESP32-C6
+* ESP32-H2
+
+## Requirements
+* ESP-IDF v5.x or newer
+* Python 3
+* CMake
+* Ninja build system
+
+## Installation
+
+Clone the repository:
+
+    git clone https://github.com/your-user/ultra-low-power-riscv-esp-idf.git
+    cd ultra-low-power-riscv-esp-idf
+
+Export ESP-IDF environment:
+
+    source $HOME/esp/esp-idf/export.sh
+
+Build the project:
+
+    idf.py build
+
+Flash to the board:
+
+    idf.py -p /dev/ttyUSB0 flash monitor
+
+## Project Structure
+
+    .
+    ├── main/
+    ├── ulp/
+    ├── components/
+    ├── CMakeLists.txt
+    ├── sdkconfig
+    └── README.md
+
+## Example Applications
+* GPIO wake-up trigger
+* Periodic sensor sampling
+* Autonomous ADC monitoring
+* Deep sleep scheduler
+* Ultra low power data acquisition
+
+## Power Optimization Tips
+* Disable unused peripherals
+* Use RTC memory whenever possible
+* Minimize wake-up intervals
+* Keep ULP routines lightweight
+* Avoid unnecessary CPU wake-ups
+
+## Documentation
+* Official ESP-IDF documentation: https://docs.espressif.com/projects/esp-idf/en/latest/
+* ULP RISC-V Guide: [Inserir Link Aqui]
+
+## Contributions
+Pull requests, issues, and suggestions are welcome.
+
+This project is licensed under the MIT License.
