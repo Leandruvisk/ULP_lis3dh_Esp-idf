@@ -1,5 +1,5 @@
 # Set usual component variables
-set(COMPONENT_SRCS "main.c" "lis3dh_reg.c")
+set(COMPONENT_SRCS "main.c" "lis3dh_reg.c" "protocols/i2c_drivers.c" "sensors/lis3dh.c")
 set(COMPONENT_ADD_INCLUDEDIRS "")
 set(COMPONENT_REQUIRES soc nvs_flash ulp esp_driver_gpio driver)
 
