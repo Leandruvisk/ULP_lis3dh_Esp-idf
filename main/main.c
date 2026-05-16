@@ -26,6 +26,7 @@ extern const uint8_t ulp_main_bin_end[]   asm("_binary_ulp_main_bin_end");
 void app_main(void)
 {
     i2c_init();
+    max30102_init();
 
     stmdev_ctx_t dev_ctx;
     dev_ctx.write_reg = platform_write;

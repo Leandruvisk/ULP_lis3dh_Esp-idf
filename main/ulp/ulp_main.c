@@ -54,6 +54,7 @@ int main(void)
         // INT1 está ALTO - movimento detectado!
         // Pisca o LED
         blink_led();
+        read_max30102 ();
         
         // Lê INT1_SRC do sensor para limpar a interrupção (latched)
         ulp_riscv_i2c_master_set_slave_reg_addr(LIS3DH_INT1_SRC);

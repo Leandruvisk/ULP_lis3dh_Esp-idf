@@ -2,9 +2,15 @@
 #define I2C_DRIVERS_H
 
 
-#define I2C_MASTER_SDA_IO 3
-#define I2C_MASTER_SCL_IO 2
-#define I2C_MASTER_NUM    I2C_NUM_0
+#define I2C_MASTER_SDA_IO_LSI3 3
+#define I2C_MASTER_SCL_IO_LSI3 2
+
+#define I2C_MASTER_SDA_IO_MAX30102 5
+#define I2C_MASTER_SCL_IO_MAX30102 6
+
+#define I2C_MASTER_NUM_LIS3             I2C_NUM_0
+#define I2C_MASTER_NUM_MAX30102         I2C_NUM_1
+
 #define I2C_FREQ_HZ       100000
 
 
