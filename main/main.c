@@ -17,6 +17,7 @@
 
 #include "protocols/i2c_drivers.h"
 #include "sensors/lis3dh.h"
+#include "sensors/max30102.h"
 
 static const char *TAG = "HOST_MAIN";
 

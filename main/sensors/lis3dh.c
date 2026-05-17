@@ -13,12 +13,12 @@ int32_t platform_write(void *handle, uint8_t reg, const uint8_t *bufp, uint16_t 
     data[0] = reg;
     memcpy(&data[1], bufp, len);
 
-    return i2c_master_write_to_device(I2C_MASTER_NUM, LIS3DH_ADDR, data, len + 1, 100 / portTICK_PERIOD_MS);
+    return i2c_master_write_to_device(I2C_MASTER_NUM_LIS3, LIS3DH_ADDR, data, len + 1, 100 / portTICK_PERIOD_MS);
 }
 
 int32_t platform_read(void *handle, uint8_t reg, uint8_t *bufp, uint16_t len)
 {
-    return i2c_master_write_read_device(I2C_MASTER_NUM, LIS3DH_ADDR, &reg, 1, bufp, len, 100 / portTICK_PERIOD_MS);
+    return i2c_master_write_read_device(I2C_MASTER_NUM_LIS3, LIS3DH_ADDR, &reg, 1, bufp, len, 100 / portTICK_PERIOD_MS);
 }
 
 void platform_delay(uint32_t ms)
