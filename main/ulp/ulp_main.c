@@ -1,125 +1,72 @@
-/* uLp/ulp_main.c */
 #include <stdint.h>
 #include "ulp_riscv.h"
-#include "ulp_riscv_utils.h"
 #include "ulp_riscv_i2c_ulp_core.h"
-#include "soc/rtc_cntl_reg.h"
-#include "ulp_riscv_gpio.h"
+#include "sensors/max30102_ulp.h"
 
-#define GPIO_LED GPIO_NUM_21
-#define GPIO_INT1 GPIO_NUM_4
+#define MAX30102_ADDR 0x57
 
-// Endereços LIS3DH
-#define LIS3DH_OUT_X_L      0x28
-#define AUTO_INCR_OUT_X_L   (LIS3DH_OUT_X_L | 0x80)
-#define LIS3DH_INT1_SRC     0x31
+/*
+ * Variáveis compartilhadas
+ */
+int32_t ulp_ir_value = 0;
+int32_t ulp_red_value = 0;
+int32_t ulp_bpm = 0;
+int32_t ulp_new_data = 0;
 
-#define MOVEMENT_THRESHOLD  2000
+/*
+ * Estado interno do ULP
+ */
+static int32_t prev_sample = 0;
+static int32_t prev_diff = 0;
 
-/* Variáveis globais (sem volatile). */
-int is_calibrated = 0;
-int16_t base_x = 0;
-int16_t base_y = 0;
-int16_t base_z = 0;
+static uint32_t sample_counter = 0;
+static uint32_t last_peak = 0;
 
-int16_t accel_x = 0;
-int16_t accel_y = 0;
-int16_t accel_z = 0;
-
-void blink_led(void)
-{
-    ulp_riscv_gpio_init(GPIO_LED);
-    ulp_riscv_gpio_output_enable(GPIO_LED);
-    ulp_riscv_gpio_set_output_mode(GPIO_LED, RTCIO_MODE_OUTPUT);
-
-    for(int i = 0; i < 3; i++) {
-        ulp_riscv_gpio_output_level(GPIO_LED, 1);
-        ulp_riscv_delay_cycles(ULP_RISCV_CYCLES_PER_MS * 100); // 100ms on
-        ulp_riscv_gpio_output_level(GPIO_LED, 0);
-        ulp_riscv_delay_cycles(ULP_RISCV_CYCLES_PER_MS * 100); // 100ms off
-    }
-}
+/* max30102_read_fifo() is implemented in sensors/max30102_ulp.c */
 
 int main(void)
 {
-    // Inicializa GPIO 4 (INT1) como entrada
-    ulp_riscv_gpio_init(GPIO_INT1);
-    ulp_riscv_gpio_input_enable(GPIO_INT1);
-    ulp_riscv_gpio_pulldown_disable(GPIO_INT1);  // Sem pull-down
+    int32_t ir;
+    int32_t red;
 
-    // Inicializa LED como saída (para indicação simples)
-    ulp_riscv_gpio_init(GPIO_LED);
-    ulp_riscv_gpio_output_enable(GPIO_LED);
-    ulp_riscv_gpio_set_output_mode(GPIO_LED, RTCIO_MODE_OUTPUT);
+    max30102_read_fifo(&ir, &red);
 
-    // Endereços I2C
-    #define I2C_ADDR_MAX30102 0x57
-    #define LIS3DH_ADDR 0x19
+    ulp_ir_value = ir;
+    ulp_red_value = red;
 
-    uint8_t buf[192];
+    /*
+     * Filtro passa alta simples
+     */
+    int32_t filtered = ir - prev_sample;
 
-    // Loop infinito: o ULP ficará aqui lendo os sensores continuamente
-    while (1) {
-        // Verifica nível do pino INT1 (LIS3 interrupt)
-        uint8_t int1_level = ulp_riscv_gpio_get_level(GPIO_INT1);
+    /*
+     * Detecção de pico
+     */
+    if ((prev_diff > 0) && (filtered < 0)) {
 
-        if (int1_level) {
-            // Movimento detectado: pequeno blink
-            for (int i = 0; i < 2; i++) {
-                ulp_riscv_gpio_output_level(GPIO_LED, 1);
-                ulp_riscv_delay_cycles(ULP_RISCV_CYCLES_PER_MS * 50);
-                ulp_riscv_gpio_output_level(GPIO_LED, 0);
-                ulp_riscv_delay_cycles(ULP_RISCV_CYCLES_PER_MS * 50);
-            }
+        uint32_t delta = sample_counter - last_peak;
 
-            // Lê INT1_SRC do LIS3 para limpar a interrupção (latched)
-            ulp_riscv_i2c_master_set_slave_addr(LIS3DH_ADDR);
-            ulp_riscv_i2c_master_set_slave_reg_addr(LIS3DH_INT1_SRC);
-            uint8_t int_src = 0;
-            ulp_riscv_i2c_master_read_from_device(&int_src, 1);
+        /*
+         * faixa válida:
+         * 40 bpm -> 150 bpm
+         */
+        if (delta > 30 && delta < 150) {
 
-            // Lê acelerômetro X/Y/Z (6 bytes, auto-increment)
-            ulp_riscv_i2c_master_set_slave_reg_addr(AUTO_INCR_OUT_X_L);
-            ulp_riscv_i2c_master_read_from_device(buf, 6);
-            accel_x = (int16_t)((buf[1] << 8) | buf[0]);
-            accel_y = (int16_t)((buf[3] << 8) | buf[2]);
-            accel_z = (int16_t)((buf[5] << 8) | buf[4]);
+            ulp_bpm = 6000 / delta;
         }
 
-        // Leitura básica do MAX30102: verifica ponteiros FIFO e lê alguns samples
-        ulp_riscv_i2c_master_set_slave_addr(I2C_ADDR_MAX30102);
-        ulp_riscv_i2c_master_set_slave_reg_addr(0x04); // FIFO_WR_PTR
-        uint8_t wptr = 0;
-        ulp_riscv_i2c_master_read_from_device(&wptr, 1);
-
-        ulp_riscv_i2c_master_set_slave_reg_addr(0x06); // FIFO_RD_PTR
-        uint8_t rptr = 0;
-        ulp_riscv_i2c_master_read_from_device(&rptr, 1);
-
-        uint8_t samp = (uint8_t)(((32 + wptr) - rptr) % 32);
-        if (samp) {
-            // Limita leitura para evitar grande uso de memória no ULP
-            uint8_t to_read = samp;
-            if (to_read > 4) to_read = 4;
-
-            ulp_riscv_i2c_master_set_slave_reg_addr(0x07); // FIFO_DATA
-            ulp_riscv_i2c_master_read_from_device(buf, 6 * to_read);
-
-            // Processa primeiro sample lido (exemplo simples)
-            uint32_t red = ((buf[0] & 0x03) << 16) | (buf[1] << 8) | buf[2];
-            uint32_t ir  = ((buf[3] & 0x03) << 16) | (buf[4] << 8) | buf[5];
-
-            // Indica presença de sinal com o LED
-            if (ir > 1000) {
-                ulp_riscv_gpio_output_level(GPIO_LED, 1);
-            } else {
-                ulp_riscv_gpio_output_level(GPIO_LED, 0);
-            }
-        }
-
-        // Pequeno delay antes da próxima iteração (200 ms)
-        ulp_riscv_delay_cycles(ULP_RISCV_CYCLES_PER_MS * 200);
+        last_peak = sample_counter;
     }
 
-    // Nunca retorna
+    prev_diff = filtered;
+    prev_sample = ir;
+
+    sample_counter++;
+
+    /*
+     * sinaliza dado novo
+     */
+    ulp_new_data = 1;
+
+    return 0;
 }
