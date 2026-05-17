@@ -2,6 +2,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include "esp_err.h"
 #include "esp_log.h"
 
 #include "ulp_riscv.h"
@@ -14,61 +15,40 @@ extern const uint8_t ulp_main_bin_end[] asm("_binary_ulp_main_bin_end");
 
 static const char *TAG = "MAX30102";
 
+static esp_err_t max30102_write_reg(uint8_t reg, uint8_t value)
+{
+    ulp_riscv_i2c_master_set_slave_reg_addr(reg);
+    return ulp_riscv_i2c_master_write_to_device(&value, 1);
+}
+
+static esp_err_t max30102_read_reg(uint8_t reg, uint8_t *value)
+{
+    ulp_riscv_i2c_master_set_slave_reg_addr(reg);
+    return ulp_riscv_i2c_master_read_from_device(value, 1);
+}
+
 static void init_i2c(void)
 {
-    /* Use RTC I2C pins valid for ESP32-S3 ULP:
-     * SDA must be GPIO1 or GPIO3
-     * SCL must be GPIO0 or GPIO2
-     * Here we choose SDA=GPIO3 and SCL=GPIO2.
-     * Do not wire SDA to GPIO2 and SCL to GPIO3; isso é invertido e inválido para ULP I2C.
-     */
-    ulp_riscv_i2c_cfg_t cfg = {
-        .i2c_pin_cfg = {
-            .sda_io_num = GPIO_NUM_3,
-            .scl_io_num = GPIO_NUM_2,
-            .sda_pullup_en = true,
-            .scl_pullup_en = true,
-        },
-        .i2c_timing_cfg = {
-            .scl_low_period = 1.4,
-            .scl_high_period = 0.3,
-            .sda_duty_period = 1,
-            .scl_start_period = 2,
-            .scl_stop_period = 1.3,
-            .i2c_trans_timeout = 20,
-        },
-    };
+    ulp_riscv_i2c_cfg_t cfg = ULP_RISCV_I2C_DEFAULT_CONFIG();
 
-    ESP_ERROR_CHECK(
-        ulp_riscv_i2c_master_init(&cfg)
-    );
+    cfg.i2c_pin_cfg.sda_io_num = GPIO_NUM_3;
+    cfg.i2c_pin_cfg.scl_io_num = GPIO_NUM_2;
 
+    ESP_ERROR_CHECK(ulp_riscv_i2c_master_init(&cfg));
     ulp_riscv_i2c_master_set_slave_addr(0x57);
+
+    ESP_LOGI(TAG, "RTC I2C initialized (SDA=GPIO3, SCL=GPIO2)");
 }
 
 static void max30102_init(void)
 {
-    uint8_t data;
+    ESP_ERROR_CHECK(max30102_write_reg(0x08, (2 << 5)));
+    ESP_ERROR_CHECK(max30102_write_reg(0x09, 0x03));
+    ESP_ERROR_CHECK(max30102_write_reg(0x0A, (3 << 5) | (3 << 2) | 3));
+    ESP_ERROR_CHECK(max30102_write_reg(0x0C, 0xD0));
+    ESP_ERROR_CHECK(max30102_write_reg(0x0D, 0xA0));
 
-    ulp_riscv_i2c_master_set_slave_reg_addr(0x08);
-    data = (2 << 5);
-    ulp_riscv_i2c_master_write_to_device(&data, 1);
-
-    ulp_riscv_i2c_master_set_slave_reg_addr(0x09);
-    data = 0x03;
-    ulp_riscv_i2c_master_write_to_device(&data, 1);
-
-    ulp_riscv_i2c_master_set_slave_reg_addr(0x0A);
-    data = (3 << 5) | (3 << 2) | 3;
-    ulp_riscv_i2c_master_write_to_device(&data, 1);
-
-    ulp_riscv_i2c_master_set_slave_reg_addr(0x0C);
-    data = 0xD0;
-    ulp_riscv_i2c_master_write_to_device(&data, 1);
-
-    ulp_riscv_i2c_master_set_slave_reg_addr(0x0D);
-    data = 0xA0;
-    ulp_riscv_i2c_master_write_to_device(&data, 1);
+    ESP_LOGI(TAG, "MAX30102 initialized");
 }
 
 static void init_ulp(void)
@@ -97,6 +77,16 @@ void app_main(void)
     init_i2c();
 
     max30102_init();
+
+    {
+        uint8_t part_id = 0;
+        esp_err_t err = max30102_read_reg(0xFF, &part_id);
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "MAX30102 part ID = 0x%02X", part_id);
+        } else {
+            ESP_LOGE(TAG, "MAX30102 probe failed: %s", esp_err_to_name(err));
+        }
+    }
 
     init_ulp();
 

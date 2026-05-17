@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include "ulp_riscv.h"
+#include "ulp_riscv_utils.h"
 #include "ulp_riscv_i2c_ulp_core.h"
 #include "sensors/max30102_ulp.h"
 
@@ -67,6 +68,7 @@ int main(void)
      * sinaliza dado novo
      */
     ulp_new_data = 1;
+    ulp_riscv_wakeup_main_processor();
 
     return 0;
 }
